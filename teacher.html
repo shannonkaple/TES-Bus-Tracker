@@ -1,0 +1,80 @@
+<!-- =========================
+<select id="mode">
+<option value="AM">Morning (Arrivals)</option>
+<option value="PM">Afternoon (Departures)</option>
+</select>
+<span id="summary" class="pill neutral" style="margin-left:8px">Loading…</span>
+</div>
+<div>
+<button class="b-neutral" onclick="downloadCSV()">Download CSV</button>
+<button class="b-neutral" onclick="window.print()">Print</button>
+</div>
+</div>
+<div class="buslist" id="list"></div>
+</section>
+</div>
+
+
+<script>
+const todayKey = () => new Date().toISOString().slice(0,10).replace(/-/g,'');
+const KEY = (part) => `tesbus_${todayKey()}_${part}`;
+const BUSES = JSON.parse(localStorage.getItem('tesbus_buses')||'[]');
+const $ = (s)=>document.querySelector(s);
+document.getElementById('mode').value = localStorage.getItem('tesbus_mode') || 'AM';
+
+
+function banner(){
+const caf = localStorage.getItem(KEY('caf')) || 'GREEN';
+$('#cafBanner').innerHTML = `<div class="pill ${caf==='GREEN'?'ok':'bad'}">Cafeteria: ${caf}</div>`;
+}
+
+
+function data(){
+const mode = $('#mode').value;
+const bucket = JSON.parse(localStorage.getItem(KEY(mode))||'{}');
+return BUSES.map(id=>({
+Plate:id,
+Status: bucket[id]?.status || (mode==='AM'?'En Route':'At School'),
+Time: mode==='AM' ? (bucket[id]?.arrivedAt||'') : (bucket[id]?.departedAt||'')
+}));
+}
+
+
+function render(){
+banner();
+const rows = data();
+const done = rows.filter(r=> r.Status==='Arrived' || r.Status==='Departed').length;
+const total = rows.length;
+const pill = $('#summary');
+pill.textContent = `${done}/${total} ${(($('#mode').value)==='AM'?'Arrived':'Departed')}`;
+pill.className = 'pill '+(done===total?'ok':(done?'warn':'neutral'));
+
+
+const root = $('#list'); root.innerHTML='';
+rows.forEach(r=>{
+const div = document.createElement('div');
+div.className='bus';
+div.innerHTML = `<div class="plate">${r.Plate}</div>
+<div style="flex:1">
+<div style="font-weight:900">${r.Status}</div>
+<div class="meta">${($('#mode').value==='AM'?'Arrived':'Departed')}: <b>${r.Time||'—'}</b></div>
+</div>`;
+root.appendChild(div);
+});
+}
+function downloadCSV(){
+const rows = data();
+const head = ['Plate','Status','Time'];
+const csv = [head.join(',')].concat(rows.map(r=> head.map(k=>`"${(r[k]||'').toString().replace(/"/g,'""')}"`).join(','))).join('\n');
+const blob = new Blob([csv], {type:'text/csv'});
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a'); a.href=url; a.download=`TES_${$('#mode').value}_${todayKey()}.csv`; a.click(); setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+
+document.getElementById('mode').addEventListener('change', (e)=>{ localStorage.setItem('tesbus_mode', e.target.value); render(); });
+render();
+setInterval(render, 8000); // auto-refresh for hallway displays
+</script>
+</body>
+</html>
