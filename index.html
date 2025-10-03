@@ -1,0 +1,73 @@
+<!-- =========================
+<div class="plate">${id}</div>
+<div style="flex:1">
+<div style="font-weight:800">${statusPill(status)}</div>
+<div class="meta">${state.mode==='AM'?'Arrived':'Departed'}: <b>${time||'—'}</b></div>
+</div>
+<div class="controls no-print">
+<button class="b-ok" onclick="quickSet('${id}','${state.mode==='AM'?'Arrived':'Departed'}')">${state.mode==='AM'?'Arrived':'Departed'}</button>
+<button class="b-warn" onclick="quickSet('${id}','${state.mode==='AM'?'En Route':'At School'}')">${state.mode==='AM'?'En Route':'At School'}</button>
+<button class="b-neutral" onclick="quickSet('${id}','Other')">Other</button>
+</div>`;
+teacherList.appendChild(div);
+});
+}
+
+
+function quickSet(id, to){
+const bucket = state[state.mode];
+const now = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+bucket[id] = bucket[id] || {};
+bucket[id].status = to;
+if(state.mode==='AM') bucket[id].arrivedAt = (to==='Arrived')? now : (to==='En Route'? '' : (bucket[id].arrivedAt||''));
+else bucket[id].departedAt = (to==='Departed')? now : (to==='At School'? '' : (bucket[id].departedAt||''));
+save(state.mode, state[state.mode]);
+renderAll();
+}
+
+
+function resetToday(which){ if(which==='AM'){ state.AM = {}; save('AM', state.AM); } if(which==='PM'){ state.PM = {}; save('PM', state.PM);} renderAll(); }
+
+
+// CSV & Print helpers
+function buildData(){
+const bucket = state[state.mode];
+return state.buses.map(id=>({
+Plate:id,
+Status: bucket[id]?.status || (state.mode==='AM'?'En Route':'At School'),
+Time: state.mode==='AM' ? (bucket[id]?.arrivedAt||'') : (bucket[id]?.departedAt||'')
+}));
+}
+function downloadCSV(){
+const rows = buildData();
+const head = ['Plate','Status','Time'];
+const csv = [head.join(',')].concat(rows.map(r=> head.map(k=>`"${(r[k]||'').toString().replace(/"/g,'""')}"`).join(','))).join('\n');
+const blob = new Blob([csv], {type:'text/csv'});
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url; a.download = `TES_${state.mode}_${todayKey()}.csv`; a.click();
+setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+
+// Settings
+function openSettings(){ $('#busEditor').value = state.buses.join('\n'); $('#settings').classList.remove('hidden'); }
+function closeSettings(){ $('#settings').classList.add('hidden'); }
+function saveBuses(){
+const arr = $('#busEditor').value.split(/\n+/).map(s=>s.trim()).filter(Boolean);
+if(arr.length){ state.buses = arr; localStorage.setItem('tesbus_buses', JSON.stringify(arr)); }
+closeSettings(); renderAll();
+}
+
+
+// Mode switch
+document.getElementById('mode').value = state.mode;
+document.getElementById('mode').addEventListener('change', (e)=>{ state.mode = e.target.value; localStorage.setItem('tesbus_mode', state.mode); renderAll(); });
+
+
+// Render all
+function renderAll(){ renderPlates(); renderTeacher(); renderCaf(); }
+renderAll();
+</script>
+</body>
+</html>
